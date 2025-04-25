@@ -12,6 +12,9 @@ import InterviewRoom from "./pages/InterviewRoom";
 import ChatBox from "./pages/MasegePage/ChatBox";
 import VideoChatBox from "./pages/MasegePage/VideoChatBox";
 "./pages/CorporateDashboard";
+import '@fortawesome/fontawesome-free/css/all.min.css';
+
+
 
 function App() {
   return (

@@ -3,11 +3,10 @@
 // import { getAuth } from 'firebase/auth';
 // import { ref, onValue, set, push, remove } from 'firebase/database';
 // import { getFirestore, doc, getDoc } from 'firebase/firestore';
-// import { realtimeDB } from '../../firebase'; // Make sure this exports your Realtime DB
+// import { realtimeDB } from '../../firebase';
 // import { generateChatId } from '../../utils/GenerateChatId';
 // import ChatBox from './ChatBox';
 
-// // ICE server config for WebRTC
 // const servers = {
 //     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
 // };
@@ -125,20 +124,17 @@
 //         };
 //     }, [myId, otherId]);
 
-//     // Helper to fetch user name from Firestore using UID
 //     const fetchUserName = async (uid) => {
 //         const db = getFirestore();
 //         const userDoc = doc(db, 'mockUsers', uid);
 //         const userSnapshot = await getDoc(userDoc);
-
 //         if (userSnapshot.exists()) {
-//             return userSnapshot.data().name|| 'Unknown User';
+//             return userSnapshot.data().name || 'Unknown User';
 //         } else {
 //             return 'Unknown User';
 //         }
 //     };
 
-    
 //     const startCall = async () => {
 //         const offer = await peerConnection.current.createOffer();
 //         await peerConnection.current.setLocalDescription(offer);
@@ -199,17 +195,15 @@
 //         }
 //     };
 
-//     // Toggle hand raise
 //     const toggleHand = async () => {
-//         const uid = currentUser?.uid; // ✅ define uid explicitly
-
+//         const uid = currentUser?.uid;
 //         if (!uid) return;
 
 //         const handRef = ref(realtimeDB, `videoChats/${chatId}/handRaise/${uid}`);
 //         const newStatus = !handRaised;
 //         setHandRaised(newStatus);
 
-//         const userName = await fetchUserName(uid); // ✅ fetch from Firestore using uid
+//         const userName = await fetchUserName(uid);
 
 //         await set(handRef, {
 //             userId: uid,
@@ -217,7 +211,6 @@
 //             raised: newStatus,
 //         });
 //     };
-
 
 //     const toggleScreenShare = async () => {
 //         try {
@@ -246,54 +239,72 @@
 //     };
 
 //     return (
-//         <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100">
-//             <div className="flex gap-6 mb-4">
-//                 <video
-//                     ref={localVideoRef}
-//                     autoPlay
-//                     muted
-//                     playsInline
-//                     className="w-64 h-48 bg-black rounded-lg"
-//                 />
-//                 <video
-//                     ref={remoteVideoRef}
-//                     autoPlay
-//                     playsInline
-//                     className="w-64 h-48 bg-black rounded-lg"
-//                 />
+//         <div className="relative w-full h-screen flex flex-col bg-white overflow-hidden">
+//             <div className="flex justify-between items-center px-6 py-2 border-b bg-gray-100 shadow-sm">
+//                 <h2 className="text-lg font-semibold">Project Review Meeting</h2>
+//                 <span className="text-sm text-gray-600">00:32:15</span>
 //             </div>
 
-//             <div className="flex flex-wrap gap-4 mb-4">
+//             <div className="flex flex-1 overflow-hidden">
+//                 <div className="flex-1 flex flex-col items-center justify-center relative bg-gray-50">
+//                     <video
+//                         ref={remoteVideoRef}
+//                         autoPlay
+//                         playsInline
+//                         className="w-[600px] h-[400px] bg-black rounded-lg shadow-lg object-cover"
+//                     />
+
+//                     <div className="absolute bottom-4 flex gap-3 bg-white/80 px-4 py-2 rounded-xl shadow-lg">
+//                         <video ref={localVideoRef} autoPlay muted playsInline className="w-20 h-14 rounded bg-black" />
+//                         <div className="w-20 h-14 bg-gray-300 rounded flex items-center justify-center text-xs">Sarah</div>
+//                         <div className="w-20 h-14 bg-gray-300 rounded flex items-center justify-center text-xs">Michael</div>
+//                         <div className="w-20 h-14 bg-gray-300 rounded flex items-center justify-center text-xs">David</div>
+//                     </div>
+//                 </div>
+
+//                 {chatOpen && (
+//                     <div className="w-[350px] border-l flex flex-col bg-white shadow-xl">
+//                         <div className="flex items-center justify-between px-4 py-2 border-b">
+//                             <span className="font-medium">Chat</span>
+//                             <span className="text-sm text-gray-500">Participants (6)</span>
+//                         </div>
+//                         <div className="flex-1 overflow-y-auto">
+//                             <ChatBox interviewId={otherId} />
+//                         </div>
+//                         <div className="p-2 border-t">
+//                             <input
+//                                 type="text"
+//                                 placeholder="Type a message..."
+//                                 className="w-full px-3 py-2 text-sm border rounded focus:outline-none"
+//                             />
+//                         </div>
+//                     </div>
+//                 )}
+//             </div>
+
+//             <div className="flex justify-center gap-3 py-3 border-t bg-gray-100">
 //                 {!callStarted && (
-//                     <button onClick={startCall} className="px-4 py-2 bg-green-500 text-white rounded">
+//                     <button onClick={startCall} className="px-4 py-2 bg-green-600 text-white rounded-lg shadow-sm">
 //                         Start Call
 //                     </button>
 //                 )}
-//                 <button onClick={endCall} className="px-4 py-2 bg-red-500 text-white rounded">
-//                     End Call
-//                 </button>
-//                 <button onClick={toggleMic} className="px-4 py-2 bg-gray-700 text-white rounded">
+//                 <button onClick={endCall} className="px-4 py-2 bg-red-600 text-white rounded-lg shadow-sm">End Call</button>
+//                 <button onClick={toggleMic} className="px-4 py-2 bg-gray-700 text-white rounded-lg">
 //                     {micOn ? 'Mute Mic 🔇' : 'Unmute Mic 🎙️'}
 //                 </button>
-//                 <button onClick={toggleCam} className="px-4 py-2 bg-gray-700 text-white rounded">
+//                 <button onClick={toggleCam} className="px-4 py-2 bg-gray-700 text-white rounded-lg">
 //                     {camOn ? 'Turn Off Cam 📷' : 'Turn On Cam 🎥'}
 //                 </button>
-//                 <button onClick={toggleHand} className="px-4 py-2 bg-yellow-500 text-black rounded">
+//                 <button onClick={toggleHand} className="px-4 py-2 bg-yellow-500 text-black rounded-lg">
 //                     {handRaised ? 'Lower Hand ✋' : 'Raise Hand ✋'}
 //                 </button>
-//                 <button onClick={toggleScreenShare} className="px-4 py-2 bg-purple-600 text-white rounded">
+//                 <button onClick={toggleScreenShare} className="px-4 py-2 bg-purple-600 text-white rounded-lg">
 //                     Share Screen 🖥️
 //                 </button>
-//                 <button onClick={() => setChatOpen((prev) => !prev)} className="px-4 py-2 bg-blue-500 text-white rounded">
+//                 <button onClick={() => setChatOpen((prev) => !prev)} className="px-4 py-2 bg-blue-500 text-white rounded-lg">
 //                     {chatOpen ? 'Close Chat 💬' : 'Open Chat 💬'}
 //                 </button>
 //             </div>
-
-//             {chatOpen && (
-//                 <div className="absolute top-6 right-6 z-20 w-[350px] h-[600px]">
-//                     <ChatBox interviewId={otherId} />
-//                 </div>
-//             )}
 //         </div>
 //     );
 // };
