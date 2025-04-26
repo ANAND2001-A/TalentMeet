@@ -55,14 +55,14 @@ export default function InterviewerList() {
         <h2 className="text-2xl font-bold">All Users</h2>
 
         {/* Logout Button */}
-        {userInfo && (
+        {/* {userInfo && (
           <button
             onClick={handleLogout}
             className="px-4 py-2 text-sm text-white bg-red-500 rounded hover:bg-red-600"
           >
             Logout
           </button>
-        )}
+        )} */}
       </div>
 
       {userInfo && (
