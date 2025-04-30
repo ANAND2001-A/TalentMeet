@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth, db, storage } from "../../firebase"; // Firebase services
-import { doc, setDoc, getDoc } from "firebase/firestore"; // Firestore methods
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Storage methods
-import { onAuthStateChanged } from "firebase/auth"; // Auth state listener
+import { auth, db, storage } from "../../firebase";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 export default function BecomeInterviewerForm() {
-  // State for form progress, active section, and edit mode
   const [formProgress, setFormProgress] = useState(0);
   const [activeSection, setActiveSection] = useState("personal");
-  const [isEditing, setIsEditing] = useState(false); // Track if editing existing profile
-  const [loading, setLoading] = useState(true); // Loading state for data fetch
-  const [error, setError] = useState(""); // Error state for Firebase operations
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false); // New: Track form submission
+  const [error, setError] = useState("");
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [userId, setUserId] = useState(null); // New: Store user UID
+  const [existingCertUrls, setExistingCertUrls] = useState([]); // New: Store existing certification URLs
 
-  // State for form data
   const [formData, setFormData] = useState({
     fullName: "",
     professionalTitle: "",
@@ -33,7 +35,6 @@ export default function BecomeInterviewerForm() {
     infoAccurate: false,
   });
 
-  // State for profile image, certifications, and availability
   const [profileImage, setProfileImage] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState("");
   const [certifications, setCertifications] = useState([]);
@@ -51,18 +52,28 @@ export default function BecomeInterviewerForm() {
 
   const navigate = useNavigate();
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest("#profile-button") && isProfileMenuOpen) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [isProfileMenuOpen]);
+
   // Fetch existing profile data on mount
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        setUserId(user.uid); // Store UID for navigation
         try {
-          // Fetch profile from Firestore using user's UID
           const profileRef = doc(db, "interviewersProfile", user.uid);
           const profileSnap = await getDoc(profileRef);
 
           if (profileSnap.exists()) {
             const data = profileSnap.data();
-            // Pre-populate form data
             setFormData({
               fullName: data.fullName || "",
               professionalTitle: data.professionalTitle || "",
@@ -81,17 +92,16 @@ export default function BecomeInterviewerForm() {
               termsAgreed: data.termsAgreed || false,
               infoAccurate: data.infoAccurate || false,
             });
-            // Pre-populate availability
             if (data.availability) {
               setAvailability(data.availability);
             }
-            // Set profile image preview (URL from Firestore)
             if (data.profileImageUrl) {
               setProfileImagePreview(data.profileImageUrl);
             }
-            // Set edit mode
+            if (data.certifications) {
+              setExistingCertUrls(data.certifications); // Store existing cert URLs
+            }
             setIsEditing(true);
-            // Update form progress
             updateFormProgress({
               ...data,
               expertise: data.expertise || [],
@@ -100,6 +110,7 @@ export default function BecomeInterviewerForm() {
             });
           }
         } catch (err) {
+          console.error("Failed to load profile:", err); // Log for debugging
           setError("Failed to load profile: " + err.message);
         }
       } else {
@@ -111,7 +122,6 @@ export default function BecomeInterviewerForm() {
     return () => unsubscribe();
   }, []);
 
-  // Handle text input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => {
@@ -121,7 +131,6 @@ export default function BecomeInterviewerForm() {
     });
   };
 
-  // Handle checkbox changes (e.g., termsAgreed)
   const handleCheckboxChange = (e) => {
     const { name, checked } = e.target;
     setFormData((prev) => {
@@ -131,21 +140,19 @@ export default function BecomeInterviewerForm() {
     });
   };
 
-  // Calculate form completion progress
   const updateFormProgress = (form) => {
     const filledFields = Object.entries(form).filter(([key, val]) => {
-      if (key === "githubUrl") return false; // Optional field
+      if (key === "githubUrl") return false;
       if (typeof val === "string") return val.trim() !== "";
       if (Array.isArray(val)) return val.length > 0;
       return val === true;
     }).length;
 
-    const totalFields = Object.keys(form).length - 1; // Exclude githubUrl
+    const totalFields = Object.keys(form).length - 1;
     const progress = Math.round((filledFields / totalFields) * 100);
     setFormProgress(progress);
   };
 
-  // Handle expertise checkbox changes
   const handleExpertiseChange = (skill) => {
     setFormData((prev) => {
       const expertise = prev.expertise.includes(skill)
@@ -157,7 +164,6 @@ export default function BecomeInterviewerForm() {
     });
   };
 
-  // Handle certification file uploads
   const handleCertificationsChange = (e) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
@@ -165,7 +171,6 @@ export default function BecomeInterviewerForm() {
     }
   };
 
-  // Toggle availability for a day and hour
   const handleAvailabilityChange = (day, hour) => {
     setAvailability((prevAvailability) => ({
       ...prevAvailability,
@@ -176,11 +181,10 @@ export default function BecomeInterviewerForm() {
     }));
   };
 
-  // Handle profile image selection and preview
   const handleProfileImageChange = (event) => {
     const file = event.target.files ? event.target.files[0] : event;
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) {
         setError("Profile image must be less than 5MB");
         return;
       }
@@ -193,43 +197,43 @@ export default function BecomeInterviewerForm() {
     }
   };
 
-  // Handle form submission (create or update profile)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSubmitting(true); // Disable submit button
 
     const user = auth.currentUser;
     if (!user) {
       setError("Please log in to submit the application");
+      setSubmitting(false);
       return;
     }
 
     try {
-      // Upload profile image to Firebase Storage
-      let profileImageUrl = profileImagePreview; // Preserve existing URL if no new image
+      let profileImageUrl = profileImagePreview;
       if (profileImage) {
-        const imageRef = ref(storage, `mockinterviewProfileImages/${user.uid}/${profileImage.name}`);
+        const imageRef = ref(storage, `profileImages/${user.uid}/${profileImage.name}`);
         await uploadBytes(imageRef, profileImage);
         profileImageUrl = await getDownloadURL(imageRef);
       }
 
-      // Upload certifications to Firebase Storage
-      const certUrls = [];
+      const certUrls = [...existingCertUrls]; // Preserve existing URLs
       for (let cert of certifications) {
-        if (cert.size > 10 * 1024 * 1024) { // 10MB limit
+        if (cert.size > 10 * 1024 * 1024) {
           setError(`Certification ${cert.name} must be less than 10MB`);
+          setSubmitting(false);
           return;
         }
-        const certRef = ref(storage, `mockinterviewCertifications/${user.uid}/${cert.name}`);
+        const certRef = ref(storage, `certifications/${user.uid}/${cert.name}`);
         await uploadBytes(certRef, cert);
         const url = await getDownloadURL(certRef);
         certUrls.push(url);
       }
 
-      // Save or update profile in Firestore
-      const interviewerRef = doc(db, "interviewersProfile", user.uid);
+      const profileRef = doc(db, "interviewersProfile", user.uid);
+      const profileSnap = await getDoc(profileRef); // Fetch existing data for createdAt
       await setDoc(
-        interviewerRef,
+        profileRef,
         {
           uid: user.uid,
           ...formData,
@@ -237,25 +241,25 @@ export default function BecomeInterviewerForm() {
           availability,
           certifications: certUrls,
           isInterviewer: true,
-          createdAt: isEditing ? formData.createdAt || new Date() : new Date(),
-          updatedAt: new Date(), // Track last update time
+          createdAt: profileSnap.exists() ? profileSnap.data().createdAt || new Date() : new Date(),
+          updatedAt: new Date(),
         },
-        { merge: true } // Merge to update existing fields
+        { merge: true }
       );
 
-      // Navigate to profile or interviewers page
       navigate(isEditing ? "/profile" : "/interviewers");
     } catch (err) {
+      console.error("Failed to submit application:", err);
       setError("Failed to submit application: " + err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  // Handle drag-over for profile image
   const handleDragOver = (event) => {
     event.preventDefault();
   };
 
-  // Handle drop for profile image
   const handleDrop = (event) => {
     event.preventDefault();
     const file = event.dataTransfer.files[0];
@@ -264,7 +268,15 @@ export default function BecomeInterviewerForm() {
     }
   };
 
-  // Render navigation tabs for form sections
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate("/auth/signin");
+    } catch (err) {
+      setError("Failed to log out: " + err.message);
+    }
+  };
+
   const renderSectionNav = () => {
     const sections = [
       { id: "personal", label: "Personal Info" },
@@ -293,7 +305,6 @@ export default function BecomeInterviewerForm() {
     );
   };
 
-  // Conditional rendering for loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -318,9 +329,83 @@ export default function BecomeInterviewerForm() {
                 Back to Home
               </button>
               <div className="relative">
-                <button className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600">
+                <button
+                  id="profile-button"
+                  className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsProfileMenuOpen(!isProfileMenuOpen);
+                  }}
+                  aria-expanded={isProfileMenuOpen}
+                  aria-haspopup="true"
+                >
                   <i className="fas fa-user"></i>
                 </button>
+                {isProfileMenuOpen && (
+                  <div
+                    className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50"
+                    role="menu"
+                  >
+                    <button
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        navigate(`/profile/${userId}`);
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      role="menuitem"
+                    >
+                      <i className="fas fa-user-circle mr-2"></i>
+                      My Profile
+                    </button>
+                    <button
+                      disabled
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed"
+                      title="Coming soon"
+                      role="menuitem"
+                    >
+                      <i className="fas fa-cog mr-2"></i>
+                      Account Settings
+                    </button>
+                    <button
+                      disabled
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed"
+                      title="Coming soon"
+                      role="menuitem"
+                    >
+                      <i className="fas fa-calendar-check mr-2"></i>
+                      My Bookings
+                    </button>
+                    <button
+                      disabled
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed"
+                      title="Coming soon"
+                      role="menuitem"
+                    >
+                      <i className="fas fa-credit-card mr-2"></i>
+                      Payment Methods
+                    </button>
+                    <button
+                      disabled
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed"
+                      title="Coming soon"
+                      role="menuitem"
+                    >
+                      <i className="fas fa-question-circle mr-2"></i>
+                      Help Center
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                      role="menuitem"
+                    >
+                      <i className="fas fa-sign-out-alt mr-2"></i>
+                      Logout
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -328,14 +413,12 @@ export default function BecomeInterviewerForm() {
 
         {/* Main Content */}
         <main>
-          {/* Error Message */}
           {error && (
             <div className="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
               {error}
             </div>
           )}
 
-          {/* Hero Section */}
           <div className="bg-white shadow-lg rounded-lg overflow-hidden mb-8">
             <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-800 text-white">
               <h1 className="text-3xl font-bold mb-4">
@@ -384,7 +467,6 @@ export default function BecomeInterviewerForm() {
             </div>
           </div>
 
-          {/* Form Progress Bar */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">
               {isEditing ? "Update Your Profile" : "Interviewer Application"}
@@ -405,12 +487,9 @@ export default function BecomeInterviewerForm() {
             </div>
           </div>
 
-          {/* Section Navigation */}
           {renderSectionNav()}
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Personal Info Section */}
             {activeSection === "personal" && (
               <div className="bg-white shadow-lg rounded-lg p-6 md:w-1/2 mx-auto">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Profile Photo</h3>
@@ -510,7 +589,6 @@ export default function BecomeInterviewerForm() {
               </div>
             )}
 
-            {/* Expertise Section */}
             {activeSection === "expertise" && (
               <div className="bg-white shadow-lg rounded-lg p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Expertise</h3>
@@ -587,7 +665,6 @@ export default function BecomeInterviewerForm() {
               </div>
             )}
 
-            {/* Availability Section */}
             {activeSection === "availability" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white shadow-lg rounded-lg p-6">
@@ -681,7 +758,6 @@ export default function BecomeInterviewerForm() {
               </div>
             )}
 
-            {/* Experience Section */}
             {activeSection === "experience" && (
               <div className="bg-white shadow-lg rounded-lg p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Professional Experience</h3>
@@ -710,7 +786,9 @@ export default function BecomeInterviewerForm() {
                 </div>
                 <button
                   type="button"
-                  className="flex items-center justify-center w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  disabled
+                  className="flex items-center justify-center w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-400 bg-white cursor-not-allowed"
+                  title="LinkedIn import not implemented"
                 >
                   <i className="fab fa-linkedin text-blue-600 mr-2"></i>
                   Import from LinkedIn
@@ -718,7 +796,6 @@ export default function BecomeInterviewerForm() {
               </div>
             )}
 
-            {/* Credentials Section */}
             {activeSection === "credentials" && (
               <div className="bg-white shadow-lg rounded-lg p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -766,10 +843,43 @@ export default function BecomeInterviewerForm() {
                         />
                       </label>
                     </div>
+                    {existingCertUrls.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">
+                          Existing Certifications:
+                        </h4>
+                        <ul className="space-y-2">
+                          {existingCertUrls.map((url, index) => (
+                            <li
+                              key={index}
+                              className="flex items-center justify-between text-sm text-gray-600 bg-gray-100 p-2 rounded"
+                            >
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-500 truncate max-w-xs"
+                              >
+                                Certification {index + 1}
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExistingCertUrls((prev) => prev.filter((_, i) => i !== index))
+                                }
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <i className="fas fa-times"></i>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     {certifications.length > 0 && (
                       <div className="mt-4">
                         <h4 className="text-sm font-medium text-gray-700 mb-2">
-                          Uploaded Files:
+                          New Uploaded Files:
                         </h4>
                         <ul className="space-y-2">
                           {certifications.map((file, index) => (
@@ -898,9 +1008,18 @@ export default function BecomeInterviewerForm() {
                   </div>
                   <button
                     type="submit"
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    disabled={submitting}
+                    className={`w-full ${
+                      submitting
+                        ? "bg-green-400 cursor-not-allowed"
+                        : "bg-green-600 hover:bg-green-700"
+                    } text-white font-medium py-3 px-4 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500`}
                   >
-                    {isEditing ? "Update Profile" : "Submit Application"}
+                    {submitting
+                      ? "Submitting..."
+                      : isEditing
+                      ? "Update Profile"
+                      : "Submit Application"}
                   </button>
                 </div>
               </div>
