@@ -4,7 +4,7 @@ import Home from "./pages/Home";
 import ProfileDetail from "./pages/ProfileDetails";
 import LoginScreen from "./pages/AuthScreens/LoginScreen";
 import SignUpScreen from "./pages/AuthScreens/SignUpScreen";
-import BecomeInterviewerForm from "./pages/InterViwer/BecomeaInterviewerForm";
+import BecomeInterviewerForm from "./pages/InterViwer/BecomeInterviewerForm";
 import InterviewerList from "./pages/Home";
 import InterviewerProfile from "./pages/InterViwer/InterViwerProfile";
 import InterviewHome from "./pages/InterViwer/InterViewerHome";

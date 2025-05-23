@@ -4,6 +4,7 @@ import { auth, db } from "../firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { UserCircle } from "lucide-react";
+import CustomButton from "./InputAndButton/CustomButton";
 
 export default function Navbar() {
   const [userInfo, setUserInfo] = useState({});
@@ -57,6 +58,7 @@ export default function Navbar() {
   }, [isProfileMenuOpen]);
 
   const handleLogout = async () => {
+    console.log("Logout clicked");
     await signOut(auth);
     setUserInfo(null);
     setIsInterviewer(false);
@@ -64,7 +66,8 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="flex items-center justify-between px-6 py-4 bg-white shadow-md">
+    <nav className="flex items-center justify-between px-6 py-4 bg-transparent shadow-none" style={{ paddingBottom: '20px' }}>
+
       <h1
         className="text-xl font-bold cursor-pointer"
         onClick={() => navigate("/")}
@@ -77,7 +80,7 @@ export default function Navbar() {
           {!isInterviewer && (
             <button
               onClick={() => navigate("/become-interviewer")}
-              className="px-4 py-2 text-sm text-white bg-green-600 rounded hover:bg-green-700"
+              className="px-4 py-2 text-sm text-white bg-button rounded hover:bg-green-700"
             >
               Become Interviewer
             </button>
@@ -90,7 +93,7 @@ export default function Navbar() {
           <div className="relative">
             <button
               id="profile-button"
-              className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 cursor-pointer"
+              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsProfileMenuOpen(!isProfileMenuOpen);
@@ -104,7 +107,7 @@ export default function Navbar() {
                   href="/profile/:id"
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  <i className="fas fa-user-circle mr-2"></i>
+                  <i className="fas fa-user-circle mr-2 "></i>
                   My Profile
                 </a>
                 <a
@@ -139,24 +142,23 @@ export default function Navbar() {
             )}
           </div>
 
-          <button
+          <CustomButton
+            text="Logout"
             onClick={handleLogout}
-            className="px-3 py-1 text-sm text-white bg-red-500 rounded hover:bg-red-600"
-          >
-            Logout
-          </button>
+            className="bg-button"
+          />
         </div>
       ) : (
         <div className="space-x-4">
           <button
             onClick={() => navigate("/signin")}
-            className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+            className="px-4 py-2 text-sm text-white bg-primary rounded"
           >
             Login
           </button>
           <button
             onClick={() => navigate("/signup")}
-            className="px-4 py-2 text-sm text-white bg-green-600 rounded hover:bg-green-700"
+            className="px-4 py-2 text-sm text-white bg-secondary rounded"
           >
             Sign Up
           </button>
